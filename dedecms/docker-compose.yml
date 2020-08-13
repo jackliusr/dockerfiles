@@ -1,0 +1,25 @@
+version: '2'
+services:
+  db:
+     image: mysql:5.7
+     volumes:
+        - db_data:/var/lib/mysql
+     restart: always
+     environment:
+       MYSQL_ROOT_PASSWORD: HbLOA5VZK2aUOiBIfLRl
+       MYSQL_DATABASE: dedecms
+       MYSQL_USER: dedecms_admin
+       MYSQL_PASSWORD: e52njuB3Xz4qgISLBVp4
+  apache_with_php:
+    depends_on:
+      - db
+    build: .
+    ports:
+      - "80:80"
+    environment:
+        WORDPRESS_DB_HOST: db:3306
+        WORDPRESS_DB_USER: wordpress
+        WORDPRESS_DB_PASSWORD: wordpress
+        WORDPRESS_DB_NAME: wordpress
+volumes:
+   db_data: {}
