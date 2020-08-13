@@ -27,6 +27,7 @@ RUN echo 'xdebug.remote_host=192.111.110.196' >> /usr/local/etc/php/php.ini
 
 COPY uploads /var/www/html
 RUN chown -hR www-data:www-data /var/www/html
+# make apache2 can bind on Priviliged ports as non root users
 RUN setcap 'cap_net_bind_service=+ep' /usr/sbin/apache2
 RUN getcap /usr/sbin/apache2
 USER www-data

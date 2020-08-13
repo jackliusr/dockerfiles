@@ -19,7 +19,6 @@ RUN pecl install xdebug-2.5.5 && docker-php-ext-enable xdebug
 docker run -it --rm php:7.0.30-apache-jessie /bin/bash
 ```
 
-交流QQ：260240310
 
 ## 版权
 关于织梦CMS，版权归官方所有。
