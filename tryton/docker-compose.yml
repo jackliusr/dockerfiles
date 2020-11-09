@@ -1,0 +1,59 @@
+version: "3.7"
+
+services: 
+  postgres:
+    image: postgres:13.0
+    container_name: gnuhealth-postgres
+    ports: 
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=gnuhealth
+      - POSTGRES_PASSWORD=jkUbZGvFNeugk
+      - POSTGRES_DB=gnuhealth
+    networks: 
+      - gnuhealth    
+  tryton-admin:
+    image: jackliusr/tryton:5.0
+    # build: 
+    #   context: ./tryton-server-gnuhealth
+    #   dockerfile: Dockerfile
+    container_name: tryton-server-admin
+    volumes:
+    - ./scripts:/app
+    command: "sh -c '/app/wait-for postgres:5432 -- /usr/local/bin/trytond-admin -d gnuhealth --all -v --email jackliusr@gmail.com -p'"
+    environment:
+      - DB_USER=gnuhealth
+      - DB_PASSWORD=jkUbZGvFNeugk
+      - DB_HOSTNAME=postgres
+      - DB_PORT=5432
+      - TRYTONPASSFILE=/app/tryton_pass
+      # uri = postgresql://postgres:postgres@localhost:5432/training
+      - TRYTOND_DATABASE_URI=postgresql://gnuhealth:jkUbZGvFNeugk@postgres:5432/
+    depends_on: 
+      - postgres
+    networks: 
+      - gnuhealth
+  tryton:
+    image: tryton/tryton:5.0
+    # build: 
+    #   context: ./tryton-server-gnuhealth
+    #   dockerfile: Dockerfile
+    container_name: tryton-server-gnuhealth
+    volumes:
+      - ./tryton:/home/gnuhealth/gnuhealth-latest
+      #- ./tryton-server-gnuhealth/modules:/home/gnuhealth/gnuhealth/tryton/server/modules
+    environment:
+      - DB_USER=gnuhealth
+      - DB_PASSWORD=jkUbZGvFNeugk
+      - DB_HOSTNAME=postgres
+      - DB_PORT=5432
+      - TRYTOND_DATABASE_URI=postgresql://gnuhealth:jkUbZGvFNeugk@postgres:5432/
+    depends_on: 
+      - postgres
+    ports:
+      - "8000:8000"
+    networks: 
+      - gnuhealth
+
+networks: 
+  gnuhealth:
