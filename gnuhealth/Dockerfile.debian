@@ -4,7 +4,7 @@ RUN npm install -g bower
 RUN curl https://downloads.tryton.org/${SERIES}/tryton-sao-last.tgz | tar zxf - -C /
 RUN cd /package && bower install --allow-root
 
-FROM ubuntu:20.04 
+FROM debian:10.6
 LABEL maintainer="Tryton <foundation@tryton.org>" \
     org.label-schema.name="Tryton" \
     org.label-schema.url="http://www.tryton.org/" \
@@ -28,8 +28,6 @@ RUN apt-get update \
         build-essential \
         curl \
         gosu \
-        libffi-dev \
-        libssl-dev \
         python-six  \
         python3 \
         python3-bcrypt \
@@ -56,13 +54,13 @@ RUN apt-get update \
         python3-tz \
         python3-wrapt \
         python3-zeep \
-        vim \
         uwsgi \
         uwsgi-plugin-python3 \
+        vim \
     && apt-get clean  \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir  \
     "trytond == ${SERIES}.*" \
     "proteus == ${SERIES}.*" \
     "python-barcode" \
@@ -70,16 +68,15 @@ RUN pip3 install --no-cache-dir \
     "python-sql" \
     "configparser" \
     "pywebdav3-gnuhealth" \
-    "vobject==0.9.6" \
     "numpy" \
     "unoconv" \
     "passlib" \
-    "beren" \
+    "vobject==0.9.6" \
     "werkzeug<1.0" \
+    "beren" \
     "poetry" \
     "pendulum" \
     "matplotlib" \
-  && cp /usr/lib/python3.8/configparser.py /usr/lib/python3.8/ConfigParser.py \
     #&& for module in `curl https://downloads.tryton.org/${SERIES}/modules.txt`; do \
   && for module in account \
   account_invoice \
@@ -96,10 +93,9 @@ RUN pip3 install --no-cache-dir \
   stock_supply \
   purchase_request ; \
   do \
-        pip3 install --no-cache-dir "trytond_${module} == ${SERIES}.*"; \
+        pip3 install --no-cache-dir  "trytond_${module} == ${SERIES}.*"; \
         done \
     && pip3 install --no-cache-dir  phonenumbers python-stdnum[SOAP] pygal
-
 
 COPY --from=builder-node /package /var/lib/trytond/www
 COPY entrypoint.sh /
@@ -109,8 +105,6 @@ COPY uwsgi.conf /etc/uwsgi.conf
 EXPOSE 8000
 
 VOLUME ["/var/lib/trytond/db"]
-#VOLUME ["/docker-entrypoint-init.d"]
-#COPY install_health.sh /docker-entrypoint-init.d/install_health.sh
 ENV TRYTOND_CONFIG=/etc/trytond.conf
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uwsgi", "--ini", "/etc/uwsgi.conf"]

@@ -21,4 +21,5 @@ if [ "${1:0:1}" = '-' ]; then
     set -- uwsgi --ini /etc/uwsgi.conf "$@"
 fi
 
-exec "$@"
+# exec "$@"
+exec gosu trytond  "$@"
