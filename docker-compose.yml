@@ -1,0 +1,28 @@
+services:
+  pg:
+    image: docker.io/library/postgres:16.4
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+        POSTGRES_PASSWORD: PFG2cpm~sJ.WC0rGyqFKf0
+        POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+        POSTGRES_DB: fusiondb_activity
+    ports:
+    - 5432:5432
+    volumes:
+      - TestFhirServerPostgres.AppHost-postgres-data:/var/lib/postgresql/data
+  cache:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --save 20 1 --loglevel warning
+    volumes: 
+      - cache:/data
+volumes:
+  TestFhirServerPostgres.AppHost-postgres-data:
+    external: true
+  cache:
