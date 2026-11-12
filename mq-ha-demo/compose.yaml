@@ -1,0 +1,133 @@
+name: mqha
+
+# Active/active: qm1 and qm2 are peers in one cluster, each with its own
+# consumer draining the shared cluster queue HA.Q.
+#
+#   docker compose up -d --build
+#   docker compose run --rm producer
+#
+# Each node also serves the IBM MQ web console (admin / passw0rd, demo only).
+# The consoles use a self-signed certificate, so use the plain-HTTP proxy on
+# port 8080/8081 - or accept the browser warning on the HTTPS ports.
+#   http://localhost:8080/ibmmq/console/   (qm1)
+#   http://localhost:8081/ibmmq/console/   (qm2)
+#   https://localhost:9443/ibmmq/console/  (qm1, self-signed)
+#   https://localhost:9444/ibmmq/console/  (qm2, self-signed)
+#
+# IBM MQ images are published for linux/amd64 - the platform pin keeps the
+# demo usable on ARM hosts through emulation.
+
+services:
+  qm1:
+    image: mqha:qm1
+    platform: linux/amd64
+    build:
+      context: .
+      args:
+        QMGR_NAME: QM1
+        PEER_QMGR_NAME: QM2
+        SELF_CONNAME: qm1(1414)
+        PEER_CONNAME: qm2(1414)
+    hostname: qm1
+    ports:
+      - "1414:1414"
+      - "9443:9443"
+    secrets:
+      - mqAdminPassword
+    volumes:
+      - qm1data:/mnt/mqm
+    stop_grace_period: 30s
+
+  qm2:
+    image: mqha:qm2
+    platform: linux/amd64
+    build:
+      context: .
+      args:
+        QMGR_NAME: QM2
+        PEER_QMGR_NAME: QM1
+        SELF_CONNAME: qm2(1414)
+        PEER_CONNAME: qm1(1414)
+    hostname: qm2
+    ports:
+      - "1415:1414"
+      - "9444:9443"
+    secrets:
+      - mqAdminPassword
+    volumes:
+      - qm2data:/mnt/mqm
+    stop_grace_period: 30s
+
+  producer:
+    image: mqha:qm1
+    platform: linux/amd64
+    entrypoint: ["/usr/local/bin/ha-put.sh"]
+    healthcheck:
+      disable: true
+    environment:
+      MQ_CONNAMES: qm1(1414),qm2(1414)
+    depends_on:
+      qm1:
+        condition: service_healthy
+      qm2:
+        condition: service_healthy
+
+  consumer1:
+    image: mqha:qm1
+    platform: linux/amd64
+    entrypoint: ["/usr/local/bin/ha-consume.sh"]
+    healthcheck:
+      disable: true
+    environment:
+      MQ_CONNAMES: qm1(1414)
+      NODE_LABEL: qm1
+      # Stay idle for an hour, then start consuming.
+      STARTUP_DELAY_SECONDS: 3600
+    restart: unless-stopped
+    depends_on:
+      qm1:
+        condition: service_healthy
+      qm2:
+        condition: service_healthy
+
+  consumer2:
+    image: mqha:qm1
+    platform: linux/amd64
+    entrypoint: ["/usr/local/bin/ha-consume.sh"]
+    healthcheck:
+      disable: true
+    environment:
+      MQ_CONNAMES: qm2(1414)
+      NODE_LABEL: qm2
+      # Stay idle for an hour, then start consuming.
+      STARTUP_DELAY_SECONDS: 3600
+    restart: unless-stopped
+    depends_on:
+      qm1:
+        condition: service_healthy
+      qm2:
+        condition: service_healthy
+
+  # Browser-facing HTTP front door for both consoles; see proxy/console.conf.
+  console-proxy:
+    image: nginx:alpine
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - ./proxy/console.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      qm1:
+        condition: service_healthy
+      qm2:
+        condition: service_healthy
+
+volumes:
+  qm1data:
+  qm2data:
+
+# The admin password must reach the container as a secret; the image creates the
+# `admin` user (and starts the web console login) only when it is supplied.
+secrets:
+  mqAdminPassword:
+    file: ./secrets/mqAdminPassword

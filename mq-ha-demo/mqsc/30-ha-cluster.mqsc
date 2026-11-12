@@ -1,0 +1,37 @@
+* Cluster membership for one half of the active/active pair.
+* The @...@ placeholders are substituted by the Dockerfile at build time.
+
+* Hold the complete cluster topology on this node, so clients and the other
+* member can still be served when the peer is down.
+ALTER QMGR REPOS(@CLUSTER_NAME@)
+
+* Cluster-receiver channel: the name by which the peer finds this node.
+DEFINE CHANNEL(TO.@QMGR_NAME@) CHLTYPE(CLUSRCVR) TRPTYPE(TCP) +
+       CONNAME('@SELF_CONNAME@') CLUSTER(@CLUSTER_NAME@) +
+       CLWLPRTY(5) CLWLWGHT(50) REPLACE
+
+* Cluster-sender channel to the peer. It retries every 5s, so start order does
+* not matter and the cluster converges within seconds of the peer coming up.
+DEFINE CHANNEL(TO.@PEER_QMGR_NAME@) CHLTYPE(CLUSSDR) TRPTYPE(TCP) +
+       CONNAME('@PEER_CONNAME@') CLUSTER(@CLUSTER_NAME@) +
+       SHORTRTY(10) SHORTTMR(5) REPLACE
+
+* The workload queue, defined identically on both nodes. CLWLUSEQ(ANY) makes
+* the cluster balance messages over both copies even when one is local, which
+* keeps the consumer on each node busy.
+DEFINE QLOCAL(@QUEUE_NAME@) CLUSTER(@CLUSTER_NAME@) CLWLUSEQ(ANY) +
+       CLWLPRTY(5) DEFBIND(NOTFIXED) REPLACE
+
+* Cluster channels. The image ships a back-stop CHLAUTH rule that denies every
+* inbound connection, so the cluster receivers need an explicit allow.
+SET CHLAUTH(TO.*) TYPE(ADDRESSMAP) ADDRESS('*') USERSRC(CHANNEL) ACTION(REPLACE)
+SET CHLAUTH(TO.*) TYPE(BLOCKUSER) USERLIST('nobody') ACTION(REPLACE)
+
+* Client channel. MCAUSER('app') keeps applications off the mqm account; app
+* is not an administrative user, so CHCKCLNT(REQDADM) does not demand a password.
+DEFINE CHANNEL(@CHANNEL_NAME@) CHLTYPE(SVRCONN) MCAUSER('app') REPLACE
+SET CHLAUTH(@CHANNEL_NAME@) TYPE(ADDRESSMAP) ADDRESS('*') +
+    USERSRC(MAP) MCAUSER('app') ACTION(REPLACE)
+SET CHLAUTH(@CHANNEL_NAME@) TYPE(BLOCKUSER) USERLIST('nobody') ACTION(REPLACE)
+SET AUTHREC PRINCIPAL('app') OBJTYPE(QMGR) AUTHADD(CONNECT,INQ)
+SET AUTHREC PROFILE(@QUEUE_NAME@) PRINCIPAL('app') OBJTYPE(QUEUE) AUTHADD(ALL)
